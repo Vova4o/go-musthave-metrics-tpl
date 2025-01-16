@@ -18,6 +18,7 @@ type Config struct {
 	DBDSN           string
 	SecretKey       string
 	CryptoPath      string
+	TrustedSubnet   string
 }
 
 // GetFlags устанавливает и получает флаги
@@ -33,6 +34,7 @@ func GetFlags() {
 	bindEnvToViper("Key", "KEY")
 	bindEnvToViper("CryptoKey", "CRYPTO_KEY")
 	bindEnvToViper("config", "CONFIG")
+	bindEnvToViper("TrustedSubnet", "TRUSTED_SUBNET")
 
 	// Read the environment variables
 	viper.AutomaticEnv()
@@ -47,6 +49,7 @@ func GetFlags() {
 	pflag.StringP("Key", "k", "", "Key for the server")
 	pflag.String("CryptoKey", "", "Path to TLS certificate directory")
 	pflag.StringP("config", "c", "", "Path to the configuration file")
+	pflag.StringP("TrustedSubnet", "t", "", "Trusted subnet for the server")
 
 	// Parse the command-line flags
 	pflag.Parse()
@@ -67,6 +70,7 @@ func GetFlags() {
 	bindFlagToViper("ServerLoggerFile")
 	bindFlagToViper("Key")
 	bindFlagToViper("CryptoKey")
+	bindFlagToViper("TrustedSubnet")
 	bindFlagToViper("config")
 
 	// Read configuration from JSON file if specified
@@ -114,6 +118,7 @@ func NewConfig() *Config {
 		DBDSN:           DBDSN(),
 		SecretKey:       Key(),
 		CryptoPath:      CryptoPath(),
+		TrustedSubnet:   TrustedSubnet(),
 	}
 }
 
@@ -145,6 +150,11 @@ func Interval() int {
 // CryptoPath возвращает путь к файлу с ключом
 func CryptoPath() string {
 	return viper.GetString("CryptoKey")
+}
+
+// TrustedSubnet возвращает доверенную подсеть
+func TrustedSubnet() string {
+	return viper.GetString("TrustedSubnet")
 }
 
 // FileStoragePath возвращает путь к файлу хранения

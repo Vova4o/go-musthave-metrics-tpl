@@ -29,6 +29,7 @@ type Middlewarer interface {
 	GunzipMiddleware() gin.HandlerFunc
 	GzipMiddleware() gin.HandlerFunc
 	CheckHash() gin.HandlerFunc
+	CheckTrustedSubnet() gin.HandlerFunc
 }
 
 // Servicer интерфейс для сервиса
@@ -61,6 +62,7 @@ func (s *Router) RegisterRoutes() {
 	s.mux.Use(s.Middl.GinZap())
 	s.mux.Use(s.Middl.GunzipMiddleware())
 	s.mux.Use(s.Middl.GzipMiddleware())
+	s.mux.Use(s.Middl.CheckTrustedSubnet())
 
 	updatesGroup := s.mux.Group("/updates")
 	updatesGroup.Use(s.Middl.CheckHash())

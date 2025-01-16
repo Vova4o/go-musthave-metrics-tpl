@@ -39,7 +39,7 @@ func main() {
 		zap.String("commit", buildCommit),
 	)
 
-	middle := middleware.New(logger, config.SecretKey)
+	middle := middleware.New(logger, config.SecretKey, config.TrustedSubnet)
 
 	stor := storage.Init(config, logger)
 

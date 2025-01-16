@@ -9,7 +9,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net"
+	"net/http"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -26,7 +29,7 @@ const (
 func createTLSConfig(certPath string) (*tls.Config, error) {
 	return &tls.Config{
 		InsecureSkipVerify: true, // For development only
-		MinVersion: tls.VersionTLS12,
+		MinVersion:         tls.VersionTLS12,
 		CipherSuites: []uint16{
 			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
 			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
@@ -93,6 +96,44 @@ func calculateHash(data, key []byte) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+// getPublicIP получает публичный IP-адрес агента
+func getPublicIP() (string, error) {
+	resp, err := http.Get("https://api.ipify.org?format=text")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	ip, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(ip), nil
+}
+
+func getLocalIP() (string, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+
+	for _, addr := range addrs {
+		ip, _, err := net.ParseCIDR(addr.String())
+		if err != nil {
+			continue
+		}
+		if ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+			continue
+		}
+		if ip.To4() != nil {
+			return ip.String(), nil
+		}
+	}
+
+	return "", fmt.Errorf("no local IP found")
+}
+
 // SendMetricsBatch отправляет метрики на сервер пакетом
 func SendMetricsBatch(cfg *flags.Config, metricsData []metrics.Metrics) {
 	client := resty.New()
@@ -109,7 +150,7 @@ func SendMetricsBatch(cfg *flags.Config, metricsData []metrics.Metrics) {
 	}
 
 	url := fmt.Sprintf("%s://%s/updates", protocol, cfg.ServerAddress)
-	log.Printf("Sending metrics to %s\n", url)	
+	log.Printf("Sending metrics to %s\n", url)
 	useGzip := ServerSupportsGzip(cfg)
 
 	// Сериализация метрик в JSON
@@ -124,9 +165,22 @@ func SendMetricsBatch(cfg *flags.Config, metricsData []metrics.Metrics) {
 		hash = calculateHash(jsonData, []byte(cfg.SecretKey))
 	}
 
+	// Получение IP-адреса агента
+	// Нам необходимо получать адрес агента на лету, так как в реальности мы не знаем где будет запущен агент
+	agentIP, err := getPublicIP()
+	if err != nil {
+		log.Printf("Failed to get public IP: %v\n", err)
+		agentIP, err = getLocalIP()
+		if err != nil {
+			log.Printf("Failed to get local IP: %v\n", err)
+			return
+		}
+	}
+
 	request := client.R().
 		SetHeader("Content-Type", "application/json").
-		SetHeader("HashSHA256", hash)
+		SetHeader("HashSHA256", hash).
+		SetHeader("X-Real-IP", agentIP)
 
 	if useGzip {
 		request.SetHeader("Content-Encoding", "gzip")
