@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -17,6 +18,10 @@ import (
 	"github.com/vova4o/yandexadv/internal/server/storage"
 	"github.com/vova4o/yandexadv/package/logger"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+
+	pb "github.com/vova4o/yandexadv/proto/metrics"
 )
 
 var (
@@ -45,6 +50,8 @@ func main() {
 
 	service := service.New(stor, logger)
 
+	grpcHandler := handler.NewGRPCServer(service, logger)
+
 	router := handler.New(service, middle, config.CryptoPath)
 	router.RegisterRoutes()
 
@@ -60,6 +67,7 @@ func main() {
 		}
 	}()
 
+	// Запуск pprof сервера в отдельной горутине
 	go func() {
 		logger.Info("Starting ppof server on :6060")
 		if err := http.ListenAndServe(":6060", nil); err != nil {
@@ -68,6 +76,26 @@ func main() {
 		}
 	}()
 
+	// Запуск gRPC сервера в отдельной горутине
+	go func() {
+		lis, err := net.Listen("tcp", config.ServerAddressGRPC)
+		if err != nil {
+			logger.Error("Failed to listen", zap.Error(err))
+			log.Fatalf("Failed to listen: %v", err)
+		}
+
+		s := grpc.NewServer()
+
+		pb.RegisterMetricsServiceServer(s, grpcHandler)
+
+		reflection.Register(s)
+
+		if err := s.Serve(lis); err != nil {
+			logger.Error("Failed to start gRPC server", zap.Error(err))
+			log.Fatalf("Failed to start gRPC server: %v", err)
+		}
+	}()
+	
 	// Ожидание сигнала завершения работы
 	<-stop
 
