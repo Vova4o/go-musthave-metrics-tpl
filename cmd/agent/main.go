@@ -35,6 +35,7 @@ func main() {
 
 	logger.Info("Starting agent")
 	logger.Info("Server address: " + config.ServerAddress)
+	logger.Info("gRPC server address: " + config.ServerAddressGRPC)
 	logger.Info("Secret key: " + config.SecretKey)
 	logger.Info("Rate limit: " + fmt.Sprintf("%d", config.RateLimit))
 
@@ -53,6 +54,7 @@ func main() {
 
 				allMetrics := append(runtimeMetrics, additionalMetrics...)
 				sender.SendMetricsBatch(config, allMetrics)
+				sender.SendMetricsBatchGRPC(config, allMetrics)
 			}
 		}()
 
@@ -65,6 +67,7 @@ func main() {
 
 				allMetrics := append(runtimeMetrics, additionalMetrics...)
 				sender.SendMetricsBatch(config, allMetrics)
+				sender.SendMetricsBatchGRPC(config, allMetrics)
 			}
 		}()
 
@@ -117,6 +120,7 @@ func main() {
 
 				allMetrics := append(combinedMetrics.RuntimeMetrics, combinedMetrics.AdditionalMetrics...)
 				sender.SendMetricsBatch(config, allMetrics)
+				sender.SendMetricsBatchGRPC(config, allMetrics)
 			}
 		}()
 
@@ -129,5 +133,6 @@ func worker(metricsChan chan AllMetrics, wg *sync.WaitGroup, config *flags.Confi
 	for metrics := range metricsChan {
 		allMetrics := append(metrics.RuntimeMetrics, metrics.AdditionalMetrics...)
 		sender.SendMetricsBatch(config, allMetrics)
+		sender.SendMetricsBatchGRPC(config, allMetrics)
 	}
 }

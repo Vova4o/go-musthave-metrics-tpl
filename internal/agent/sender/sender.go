@@ -3,6 +3,7 @@ package sender
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/tls"
@@ -18,12 +19,25 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/vova4o/yandexadv/internal/agent/flags"
 	"github.com/vova4o/yandexadv/internal/agent/metrics"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	pb "github.com/vova4o/yandexadv/proto/metrics"
 )
 
 const (
 	maxRetries = 3
 	retryDelay = 1 * time.Second
 )
+
+func createGRPCClient(serverAddress string) (pb.MetricsServiceClient, *grpc.ClientConn, error) {
+	conn, err := grpc.Dial(serverAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to connect to server: %w", err)
+	}
+	client := pb.NewMetricsServiceClient(conn)
+	return client, conn, nil
+}
 
 // createTLSConfig creates TLS configuration with the provided certificate
 func createTLSConfig(certPath string) (*tls.Config, error) {
@@ -132,6 +146,68 @@ func getLocalIP() (string, error) {
 	}
 
 	return "", fmt.Errorf("no local IP found")
+}
+
+// SendMetricsBatchGRPC отправляет метрики на сервер пакетом через gRPC
+func SendMetricsBatchGRPC(cfg *flags.Config, metricsData []metrics.Metrics) {
+	client, conn, err := createGRPCClient(cfg.ServerAddressGRPC)
+	if err != nil {
+		log.Printf("Failed to create gRPC client: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	var grpcMetrics []*pb.MetricGRPC
+    for _, m := range metricsData {
+        grpcMetric := &pb.MetricGRPC{
+            Id:   m.ID,
+            Type: m.MType,
+        }
+        if m.Value != nil {
+            grpcMetric.Value = *m.Value // Разыменовываем указатель
+        }
+        if m.Delta != nil {
+            grpcMetric.Delta = *m.Delta // Разыменовываем указатель
+        }
+        grpcMetrics = append(grpcMetrics, grpcMetric)
+    }
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err = client.UpdateBatchMetrics(ctx, &pb.UpdateBatchMetricsRequest{Metrics: grpcMetrics})
+	if err != nil {
+		log.Printf("Failed to send metrics: %v", err)
+	}
+}
+
+// SendMetricGRPC отправляет метрику на сервер через gRPC
+func SendMetricGRPC(cfg *flags.Config, metric metrics.Metrics) {
+	client, conn, err := createGRPCClient(cfg.ServerAddressGRPC)
+	if err != nil {
+		log.Printf("Failed to create gRPC client: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	grpcMetric := &pb.MetricGRPC{
+        Id:   metric.ID,
+        Type: metric.MType,
+    }
+    if metric.Value != nil {
+        grpcMetric.Value = *metric.Value // Разыменовываем указатель
+    }
+    if metric.Delta != nil {
+        grpcMetric.Delta = *metric.Delta // Разыменовываем указатель
+    }
+
+    _, err = client.UpdateMetric(ctx, &pb.UpdateMetricRequest{Metric: grpcMetric})
+    if err != nil {
+        log.Printf("Failed to send metric: %v", err)
+    }
 }
 
 // SendMetricsBatch отправляет метрики на сервер пакетом

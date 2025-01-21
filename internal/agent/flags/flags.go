@@ -18,6 +18,7 @@ type Config struct {
 	SecretKey       string
 	RateLimit       int
 	CryptoPath      string
+	ServerAddressGRPC string
 }
 
 // GetFlags устанавливает и получает флаги
@@ -31,6 +32,7 @@ func GetFlags() {
 	pflag.IntP("RateLimit", "l", 0, "Rate limit for the server")
 	pflag.String("crypto-key", "", "Crypto key file path")
 	pflag.StringP("config", "c", "", "Path to the configuration file")
+	pflag.StringP("ServerAddressGRPC", "g", "localhost:50051", "GRPC server network address")
 
 	// Parse the command-line flags
 	pflag.Parse()
@@ -51,6 +53,7 @@ func GetFlags() {
 	bindFlagToViper("RateLimit")
 	bindFlagToViper("crypto-key")
 	bindFlagToViper("config")
+	bindFlagToViper("ServerAddressGRPC")
 
 	// Set the environment variable names
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -62,6 +65,7 @@ func GetFlags() {
 	bindEnvToViper("RateLimit", "RATE_LIMIT")
 	bindEnvToViper("crypto-key", "CRYPTO_KEY")
 	bindEnvToViper("config", "CONFIG")
+	bindEnvToViper("ServerAddressGRPC", "SERVER_ADDRESS_GRPC")
 
 	configFile := viper.GetString("config")
 	if configFile != "" {
@@ -100,7 +104,13 @@ func NewConfig() *Config {
 		SecretKey:       GetKey(),
 		RateLimit:       GetRateLimit(),
 		CryptoPath:      CryptoPath(),
+		ServerAddressGRPC: GetServerAddressGRPC(),
 	}
+}
+
+// GetServerAddressGRPC возвращает адрес сервера GRPC
+func GetServerAddressGRPC() string {
+	return viper.GetString("ServerAddressGRPC")
 }
 
 // GetRateLimit возвращает ограничение скорости
