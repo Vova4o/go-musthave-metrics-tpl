@@ -10,14 +10,16 @@ import (
 
 // Config структура конфигурации
 type Config struct {
-	ServerAddress   string
-	StoreInterval   int
-	FileStoragePath string
-	Restore         bool
-	ServerLogFile   string
-	DBDSN           string
-	SecretKey       string
-	CryptoPath      string
+	ServerAddress     string
+	StoreInterval     int
+	FileStoragePath   string
+	Restore           bool
+	ServerLogFile     string
+	DBDSN             string
+	SecretKey         string
+	CryptoPath        string
+	TrustedSubnet     string
+	ServerAddressGRPC string
 }
 
 // GetFlags устанавливает и получает флаги
@@ -33,6 +35,8 @@ func GetFlags() {
 	bindEnvToViper("Key", "KEY")
 	bindEnvToViper("CryptoKey", "CRYPTO_KEY")
 	bindEnvToViper("config", "CONFIG")
+	bindEnvToViper("TrustedSubnet", "TRUSTED_SUBNET")
+	bindEnvToViper("ServerAddressGRPC", "SERVER_ADDRESS_GRPC")
 
 	// Read the environment variables
 	viper.AutomaticEnv()
@@ -47,6 +51,8 @@ func GetFlags() {
 	pflag.StringP("Key", "k", "", "Key for the server")
 	pflag.String("CryptoKey", "", "Path to TLS certificate directory")
 	pflag.StringP("config", "c", "", "Path to the configuration file")
+	pflag.StringP("TrustedSubnet", "t", "", "Trusted subnet for the server")
+	pflag.StringP("ServerAddressGRPC", "g", "localhost:50051", "GRPC server network address")
 
 	// Parse the command-line flags
 	pflag.Parse()
@@ -67,7 +73,9 @@ func GetFlags() {
 	bindFlagToViper("ServerLoggerFile")
 	bindFlagToViper("Key")
 	bindFlagToViper("CryptoKey")
+	bindFlagToViper("TrustedSubnet")
 	bindFlagToViper("config")
+	bindFlagToViper("ServerAddressGRPC")
 
 	// Read configuration from JSON file if specified
 	configFile := viper.GetString("config")
@@ -106,15 +114,22 @@ func bindEnvToViper(viperKey, envKey string) {
 func NewConfig() *Config {
 	GetFlags()
 	return &Config{
-		ServerAddress:   Address(),
-		StoreInterval:   Interval(),
-		FileStoragePath: FileStoragePath(),
-		Restore:         Restore(),
-		ServerLogFile:   ServerLogFile(),
-		DBDSN:           DBDSN(),
-		SecretKey:       Key(),
-		CryptoPath:      CryptoPath(),
+		ServerAddress:     Address(),
+		StoreInterval:     Interval(),
+		FileStoragePath:   FileStoragePath(),
+		Restore:           Restore(),
+		ServerLogFile:     ServerLogFile(),
+		DBDSN:             DBDSN(),
+		SecretKey:         Key(),
+		CryptoPath:        CryptoPath(),
+		TrustedSubnet:     TrustedSubnet(),
+		ServerAddressGRPC: ServerAddressGRPC(),
 	}
+}
+
+// ServerAddressGRPC возвращает адрес сервера GRPC
+func ServerAddressGRPC() string {
+	return viper.GetString("ServerAddressGRPC")
 }
 
 // Key возвращает ключ
@@ -145,6 +160,11 @@ func Interval() int {
 // CryptoPath возвращает путь к файлу с ключом
 func CryptoPath() string {
 	return viper.GetString("CryptoKey")
+}
+
+// TrustedSubnet возвращает доверенную подсеть
+func TrustedSubnet() string {
+	return viper.GetString("TrustedSubnet")
 }
 
 // FileStoragePath возвращает путь к файлу хранения

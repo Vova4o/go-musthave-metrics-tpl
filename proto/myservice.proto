@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package metrics;
+
+option go_package = "proto/metrics";
+
+// Определение сообщения для метрики
+message MetricGRPC {
+  string id = 1;
+  string type = 2;
+  double value = 3;
+  int64 delta = 4;
+}
+
+// Определение сообщения для списка метрик
+message MetricsGRPC {
+  repeated MetricGRPC metrics = 1;
+}
+
+// Определение запроса для получения значения метрики
+message GetValueRequest {
+  string type = 1;
+  string name = 2;
+}
+
+// Определение ответа для получения значения метрики
+message GetValueResponse {
+  string value = 1;
+}
+
+// Определение запроса для обновления метрики
+message UpdateMetricRequest {
+  MetricGRPC metric = 1;
+}
+
+// Определение ответа для обновления метрики
+message UpdateMetricResponse {
+  MetricGRPC metric = 1;
+}
+
+// Определение запроса для обновления метрик пакетом
+message UpdateBatchMetricsRequest {
+  repeated MetricGRPC metrics = 1;
+}
+
+// Определение ответа для обновления метрик пакетом
+message UpdateBatchMetricsResponse {
+  string status = 1;
+}
+
+// Определение запроса для проверки подключения к базе данных
+message PingRequest {}
+
+// Определение ответа для проверки подключения к базе данных
+message PingResponse {
+  string status = 1;
+}
+
+// Определение gRPC сервиса
+service MetricsService {
+  rpc GetValue (GetValueRequest) returns (GetValueResponse);
+  rpc UpdateMetric (UpdateMetricRequest) returns (UpdateMetricResponse);
+  rpc UpdateBatchMetrics (UpdateBatchMetricsRequest) returns (UpdateBatchMetricsResponse);
+  rpc Ping (PingRequest) returns (PingResponse);
+}

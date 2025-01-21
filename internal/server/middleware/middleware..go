@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -20,15 +21,17 @@ import (
 
 // Middleware структура для middleware
 type Middleware struct {
-	SecretKey string
-	Logger    *logger.Logger
+	SecretKey     string
+	TrustedSubnet string
+	Logger        *logger.Logger
 }
 
 // New создание нового middleware
-func New(log *logger.Logger, key string) *Middleware {
+func New(log *logger.Logger, key string, subnet string) *Middleware {
 	return &Middleware{
 		Logger:    log,
 		SecretKey: key,
+		TrustedSubnet: subnet,
 	}
 }
 
@@ -201,5 +204,36 @@ func (m Middleware) GinZap() gin.HandlerFunc {
 			zap.Int("content_length", contentLengthInt),
 			zap.Duration("parsed_latency", parsedLatency),
 		)
+	}
+}
+
+// CheckTrustedSubnet - middleware для проверки IP-адреса клиента
+func (m Middleware) CheckTrustedSubnet() gin.HandlerFunc {
+	trustedSubnet := m.TrustedSubnet
+	return func(c *gin.Context) {
+		if trustedSubnet == "" {
+			c.Next()
+			return
+		}
+
+		ip := c.Request.Header.Get("X-Real-IP")
+		if ip == "" {
+			c.AbortWithStatus(http.StatusForbidden)
+			return
+		}
+
+		_, subnet, err := net.ParseCIDR(trustedSubnet)
+		if err != nil {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		agentIP := net.ParseIP(ip)
+		if agentIP == nil || !subnet.Contains(agentIP) {
+			c.AbortWithStatus(http.StatusForbidden)
+			return
+		}
+
+		c.Next()
 	}
 }
